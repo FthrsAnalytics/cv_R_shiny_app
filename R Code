@@ -22,7 +22,7 @@ ui <- pageWithSidebar(
      
     #Input - Date Range
     dateRangeInput(inputId = "date_range", label = "Select Date Range",
-                   start = min(cv_data$StartDate), end = max(cv_data$EndDate),
+                   start = "2016-01-01", end = max(cv_data$EndDate),
                    min = min(cv_data$StartDate), max = max(cv_data$EndDate)
     ),
     #Input - Section
