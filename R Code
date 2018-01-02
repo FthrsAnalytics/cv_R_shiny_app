@@ -2,40 +2,69 @@ library(shiny)
 library(readxl)
 library(dplyr)
 
-CVdata <- read_excel("C:/Users/josyeat/Documents/FeathersAnalyticsCV/ResumeRShiny.xlsx")
-CVdata
+cv_data <- read_excel("ResumeRShiny.xlsx")
+
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
+ui <- pageWithSidebar(
    
   #Title Panel 
-  titlePanel("Joseph Yeates CV"),
+  headerPanel("Joseph Yeates - CV"
+  ),
 
-  #Sidebar Layout
-   sidebarLayout(
-     
+  #Description and inputs
+  sidebarPanel(
+    
     #Highlights of Qualifications
-     sidebarPanel(h2("Highlights of Qualifications"),
-                  p("The list of highlights"),
+    h3("Highlights of Qualifications"),
+    p("The list of highlights"
+    ),
      
-      #Select Inputs
-                  dateRangeInput("DateRange", label = "Date Range", start = min(CVdata$StartDate), end = max(CVdata$EndDate), min = min(CVdata$StartDate), max = max(CVdata$EndDate)),
-                  selectInput("SelectSection", label = "Select CV Section", choices = unique(CVdata$Section), selected = "Work Experience")
-      ),
-      #Main Panel
-      mainPanel(textOutput("selected_section"))
-   )
+    #Input - Date Range
+    dateRangeInput(inputId = "date_range", label = "Select Date Range",
+                   start = min(cv_data$StartDate), end = max(cv_data$EndDate),
+                   min = min(cv_data$StartDate), max = max(cv_data$EndDate)
+    ),
+    #Input - Section
+    selectInput(inputId = "select_section", label = "Select CV Section", 
+                choices = unique(cv_data$Section), selected = "Work Experience"
+    # ),
+    # #Input - Current Role
+    # checkboxInput(inputId = "current_role", label = "Show Current Endeavors", TRUE
+    )
+  ),
+     
+  #Main Panel - Position Outputs
+  mainPanel(textOutput(outputId = "position")
+  )
 )
+
 
 # Define server logic
 server <- function(input, output) {
-   
-  output$selected_section <- renderText({
-    section_desc <- CVdata %>% 
-                    filter(Section == input$SelectSection & StartDate >= as.POSIXct(input$DateRange[1]))
-                           })
+  
+  #Subset data
+  cv_positions <- reactive({
+    req(input$date_range)
+    validate(need(!is.na(input$date_range[1]) & !is.na(input$date_range[2]), "Please provide complete date range."))
+    validate(need(input$date_range[1] < input$date_range[2], "End date should be later than start date in date range."))
+    
+    cv_data %>%
+      filter(Section == input$select_section & 
+              (StartDate >= as.POSIXct(input$date_range[1]) & 
+                 StartDate <= as.POSIXct(input$date_range[2]) | 
+                 (EndDate >= as.POSIXct(input$date_range[1]) & 
+                 EndDate <= as.POSIXct(input$date_range[2])) |
+                 (StartDate <= as.POSIXct(input$date_range[1]) &
+                  EndDate >= as.POSIXct(input$date_range[2]))
+              )
+      )
+  })
+  #Pull in CV positions 
+  output$position <- renderPrint({
+    cv_positions()$Organization
+  })
 }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
