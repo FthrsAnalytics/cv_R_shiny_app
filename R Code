@@ -1,6 +1,7 @@
 library(shiny)
 library(readxl)
 library(dplyr)
+library(DT)
 
 cv_data <- read_excel("ResumeRShiny.xlsx")
 
@@ -15,27 +16,39 @@ ui <- pageWithSidebar(
   #Description and inputs
   sidebarPanel(
     
-    #Highlights of Qualifications
-    h3("Highlights of Qualifications"),
-    p("The list of highlights"
+    #Input - Current Role
+    checkboxInput(inputId = "current", label = strong("Select Current Endeavors"), FALSE
+    ),
+    
+    #Input - Section
+    selectInput(inputId = "select_section", label = "Select CV Section", 
+                choices = unique(cv_data$Section), selected = "Work Experience"
     ),
      
     #Input - Date Range
     dateRangeInput(inputId = "date_range", label = "Select Date Range",
                    start = "2016-01-01", end = max(cv_data$EndDate),
                    min = min(cv_data$StartDate), max = max(cv_data$EndDate)
-    ),
-    #Input - Section
-    selectInput(inputId = "select_section", label = "Select CV Section", 
-                choices = unique(cv_data$Section), selected = "Work Experience"
-    # ),
-    # #Input - Current Role
-    # checkboxInput(inputId = "current_role", label = "Show Current Endeavors", TRUE
     )
   ),
      
   #Main Panel - Position Outputs
-  mainPanel(textOutput(outputId = "position")
+  mainPanel(
+    
+    #Highlights of Qualifications
+    h3("Highlights of Qualifications"
+    ),
+    p("Excellent communication skills developed through translating data insights to business stakeholders as well as presentations at the Vancouver Power BI User Group"
+    ),
+    p("Analytical and creative problem solving honed through experience manipulating, analyzing, and visualizing data in SQL Server, tidyverse R packages, and Power BI"
+    ),
+    p("Leadership and teamwork skills demonstrated through working in cross-functional teams executing enterprise wide projects and sitting on board of directors for a volunteer environmental society"
+    ),
+    p("Proven time management abilities: balancing extracurricular career, academic, athletic, and independent project work activities"
+    ),
+    
+    #Data table of selected infomration
+    DT::dataTableOutput(outputId = "position")
   )
 )
 
@@ -48,21 +61,30 @@ server <- function(input, output) {
     req(input$date_range)
     validate(need(!is.na(input$date_range[1]) & !is.na(input$date_range[2]), "Please provide complete date range."))
     validate(need(input$date_range[1] < input$date_range[2], "End date should be later than start date in date range."))
-    
-    cv_data %>%
-      filter(Section == input$select_section & 
-              (StartDate >= as.POSIXct(input$date_range[1]) & 
-                 StartDate <= as.POSIXct(input$date_range[2]) | 
-                 (EndDate >= as.POSIXct(input$date_range[1]) & 
-                 EndDate <= as.POSIXct(input$date_range[2])) |
-                 (StartDate <= as.POSIXct(input$date_range[1]) &
-                  EndDate >= as.POSIXct(input$date_range[2]))
-              )
-      )
+    if(input$current) {
+      cv_data %>%
+        filter(Current == 1) %>%
+        arrange(desc(StartDate)) %>%
+        select(Section, Organization, Position)
+    } else {
+      cv_data %>%
+        filter(Section == input$select_section) %>%
+        filter(
+          (StartDate >= as.POSIXct(input$date_range[1]) & 
+            StartDate <= as.POSIXct(input$date_range[2])) | 
+          (EndDate >= as.POSIXct(input$date_range[1]) & 
+            EndDate <= as.POSIXct(input$date_range[2])) |
+          (StartDate <= as.POSIXct(input$date_range[1]) &
+            EndDate >= as.POSIXct(input$date_range[2]))
+        )
+    } %>%
+      arrange(desc(StartDate)) %>%
+      select(Organization, Position)
   })
+  
   #Pull in CV positions 
-  output$position <- renderPrint({
-    cv_positions()$Organization
+  output$position <- renderDataTable({
+    DT::datatable(cv_positions(), options = list(dom = 't'))
   })
 }
 
