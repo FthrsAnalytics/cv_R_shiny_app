@@ -1,41 +1,92 @@
 library(shiny)
 library(readxl)
 library(dplyr)
+library(DT)
 
-CVdata <- read_excel("C:/Users/josyeat/Documents/FeathersAnalyticsCV/ResumeRShiny.xlsx")
-CVdata
+cv_data <- read_excel("ResumeRShiny.xlsx")
+
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
+ui <- pageWithSidebar(
    
   #Title Panel 
-  titlePanel("Joseph Yeates CV"),
+  headerPanel("Joseph Yeates - CV"
+  ),
 
-  #Sidebar Layout
-   sidebarLayout(
+  #Description and inputs
+  sidebarPanel(
+    
+    #Input - Current Role
+    checkboxInput(inputId = "current", label = strong("Select Current Endeavors"), FALSE
+    ),
+    
+    #Input - Section
+    selectInput(inputId = "select_section", label = "Select CV Section", 
+                choices = unique(cv_data$Section), selected = "Work Experience"
+    ),
      
+    #Input - Date Range
+    dateRangeInput(inputId = "date_range", label = "Select Date Range",
+                   start = "2016-01-01", end = max(cv_data$EndDate),
+                   min = min(cv_data$StartDate), max = max(cv_data$EndDate)
+    )
+  ),
+     
+  #Main Panel - Position Outputs
+  mainPanel(
+    
     #Highlights of Qualifications
-     sidebarPanel(h2("Highlights of Qualifications"),
-                  p("The list of highlights"),
-     
-      #Select Inputs
-                  dateRangeInput("DateRange", label = "Date Range", start = min(CVdata$StartDate), end = max(CVdata$EndDate), min = min(CVdata$StartDate), max = max(CVdata$EndDate)),
-                  selectInput("SelectSection", label = "Select CV Section", choices = unique(CVdata$Section), selected = "Work Experience")
-      ),
-      #Main Panel
-      mainPanel(textOutput("selected_section"))
-   )
+    h3("Highlights of Qualifications"
+    ),
+    p("Excellent communication skills developed through translating data insights to business stakeholders as well as presentations at the Vancouver Power BI User Group"
+    ),
+    p("Analytical and creative problem solving honed through experience manipulating, analyzing, and visualizing data in SQL Server, tidyverse R packages, and Power BI"
+    ),
+    p("Leadership and teamwork skills demonstrated through working in cross-functional teams executing enterprise wide projects and sitting on board of directors for a volunteer environmental society"
+    ),
+    p("Proven time management abilities: balancing extracurricular career, academic, athletic, and independent project work activities"
+    ),
+    
+    #Data table of selected infomration
+    DT::dataTableOutput(outputId = "position")
+  )
 )
+
 
 # Define server logic
 server <- function(input, output) {
-   
-  output$selected_section <- renderText({
-    section_desc <- CVdata %>% 
-                    filter(Section == input$SelectSection & StartDate >= as.POSIXct(input$DateRange[1]))
-                           })
+  
+  #Subset data
+  cv_positions <- reactive({
+    req(input$date_range)
+    validate(need(!is.na(input$date_range[1]) & !is.na(input$date_range[2]), "Please provide complete date range."))
+    validate(need(input$date_range[1] < input$date_range[2], "End date should be later than start date in date range."))
+    if(input$current) {
+      cv_data %>%
+        filter(Current == 1) %>%
+        arrange(desc(StartDate)) %>%
+        select(Section, Organization, Position)
+    } else {
+      cv_data %>%
+        filter(Section == input$select_section) %>%
+        filter(
+          (StartDate >= as.POSIXct(input$date_range[1]) & 
+            StartDate <= as.POSIXct(input$date_range[2])) | 
+          (EndDate >= as.POSIXct(input$date_range[1]) & 
+            EndDate <= as.POSIXct(input$date_range[2])) |
+          (StartDate <= as.POSIXct(input$date_range[1]) &
+            EndDate >= as.POSIXct(input$date_range[2]))
+        )
+    } %>%
+      arrange(desc(StartDate)) %>%
+      select(Organization, Position)
+  })
+  
+  #Pull in CV positions 
+  output$position <- renderDataTable({
+    DT::datatable(cv_positions(), options = list(dom = 't'))
+  })
 }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
